@@ -109,6 +109,43 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
+        /* 统一选项控制面板（先手选择、难度选择） */
+        .option-wrapper {
+            width: 100%;
+            background: #2d3748;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            color: #cbd5e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid #4a5568;
+        }
+
+        .option-btn-group {
+            display: flex;
+            gap: 6px;
+        }
+
+        .opt-btn {
+            border: 1px solid #4a5568;
+            background: #1a202c;
+            color: #a0aec0;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .opt-btn.active {
+            background: #ed8936;
+            color: #1a202c;
+            font-weight: bold;
+            border-color: #ed8936;
+        }
+
         /* 联机控制面板样式 */
         .online-wrapper {
             width: 100%;
@@ -158,69 +195,6 @@
             color: #f6ad55;
             text-align: center;
             line-height: 1.3;
-        }
-
-        .difficulty-wrapper {
-            width: 100%;
-            background: #2d3748;
-            border-radius: 10px;
-            padding: 6px 12px;
-            font-size: 0.85rem;
-            color: #cbd5e0;
-            transition: all 0.3s ease;
-        }
-
-        .difficulty-selector {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-        }
-
-        .diff-btn-group {
-            display: flex;
-            gap: 6px;
-        }
-
-        .diff-btn {
-            border: 1px solid #4a5568;
-            background: #1a202c;
-            color: #a0aec0;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .diff-btn.active {
-            background: #ed8936;
-            color: #1a202c;
-            font-weight: bold;
-            border-color: #ed8936;
-        }
-
-        .difficulty-collapsed {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-        }
-
-        .btn-change-diff {
-            background: #4a5568;
-            color: #f6ad55;
-            border: none;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }
-
-        .btn-change-diff:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            color: #a0aec0;
         }
 
         .scoreboard {
@@ -497,6 +471,25 @@
             <button class="mode-btn" id="mode-online" onclick="switchMode('online')">🌐 跨城联机</button>
         </div>
 
+        <!-- 先手选择面板 -->
+        <div class="option-wrapper" id="first-player-wrapper">
+            <span>♟️ 先手选择:</span>
+            <div class="option-btn-group">
+                <button class="opt-btn active" id="first-p1" onclick="selectFirstPlayer('p1')">玩家先手 (执黑)</button>
+                <button class="opt-btn" id="first-p2" onclick="selectFirstPlayer('p2')">玩家后手 (执白)</button>
+            </div>
+        </div>
+
+        <!-- AI 难度选择面板 -->
+        <div class="option-wrapper" id="difficulty-wrapper" style="display: none;">
+            <span>🤖 AI 难度:</span>
+            <div class="option-btn-group">
+                <button class="opt-btn" id="diff-easy" onclick="selectDifficulty('easy')">简单</button>
+                <button class="opt-btn active" id="diff-medium" onclick="selectDifficulty('medium')">普通</button>
+                <button class="opt-btn" id="diff-hard" onclick="selectDifficulty('hard')">困难</button>
+            </div>
+        </div>
+
         <!-- 联机面板 -->
         <div class="online-wrapper" id="online-wrapper" style="display: none;">
             <div class="online-inputs">
@@ -504,22 +497,7 @@
                 <input type="text" class="online-input" id="room-id-input" placeholder="输入4位数字房间号">
                 <button class="online-btn" onclick="joinOnlineRoomFromInput()">加入</button>
             </div>
-            <div class="online-status" id="online-status-text">提示：新建房间后将自动生成4位数字房间号</div>
-        </div>
-
-        <div class="difficulty-wrapper" id="difficulty-wrapper" style="display: none;">
-            <div class="difficulty-selector" id="diff-expanded">
-                <span>🤖 AI 难度选择:</span>
-                <div class="diff-btn-group">
-                    <button class="diff-btn" id="diff-easy" onclick="selectDifficulty('easy')">简单</button>
-                    <button class="diff-btn active" id="diff-medium" onclick="selectDifficulty('medium')">普通</button>
-                    <button class="diff-btn" id="diff-hard" onclick="selectDifficulty('hard')">困难</button>
-                </div>
-            </div>
-            <div class="difficulty-collapsed" id="diff-collapsed" style="display: none;">
-                <span>🤖 AI 难度: <strong id="current-diff-text" style="color: #f6ad55;">普通</strong></span>
-                <button class="btn-change-diff" id="btn-change-diff" onclick="expandDifficulty()">修改难度</button>
-            </div>
+            <div class="online-status" id="online-status-text">提示：新建房间后自动生成4位数字房间号</div>
         </div>
 
         <div class="scoreboard">
@@ -654,21 +632,20 @@
         }
 
         const BOARD_SIZE = 5;
-        const EMPTY = 0, P1 = 1, P2 = 2;
-
-        const diffNames = { easy: '简单', medium: '普通', hard: '困难' };
+        const EMPTY = 0, P1 = 1, P2 = 2; // P1 为黑子，P2 为白子
 
         let grid = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
         let history = [];
-        let currentTurn = P1;
+        let currentTurn = P1; // 永远从执黑的 P1 开始
         let gameMode = 'pvp';
         let aiDifficulty = 'medium';
+        let userRoleInAI = P1; // 在 AI 模式中，玩家扮演角色：P1(黑子/先手) 或 P2(白子/后手)
         let gameOver = false;
 
         // 联网专用变量
         let peer = null;
         let conn = null;
-        let myRole = P1; // 默认 P1 (房主执黑, P2 访客执白)
+        let myRole = P1; // 联网模式中我的角色
 
         const boardEl = document.getElementById('board');
         const scoreP1El = document.getElementById('score-p1');
@@ -681,11 +658,8 @@
         const breakdownP2 = document.getElementById('breakdown-p2');
         const btnUndo = document.getElementById('btn-undo');
         
+        const firstPlayerWrapper = document.getElementById('first-player-wrapper');
         const diffWrapper = document.getElementById('difficulty-wrapper');
-        const diffExpanded = document.getElementById('diff-expanded');
-        const diffCollapsed = document.getElementById('diff-collapsed');
-        const currentDiffText = document.getElementById('current-diff-text');
-        const btnChangeDiff = document.getElementById('btn-change-diff');
         const onlineWrapper = document.getElementById('online-wrapper');
         const onlineStatusText = document.getElementById('online-status-text');
 
@@ -696,59 +670,73 @@
             document.getElementById(`mode-${mode}`).classList.add('active');
 
             if (mode === 'pvp') {
-                nameP1El.innerText = "玩家 1";
-                nameP2El.innerText = "玩家 2";
+                firstPlayerWrapper.style.display = 'flex';
+                document.getElementById('first-p1').innerText = "玩家 1 先手 (执黑)";
+                document.getElementById('first-p2').innerText = "玩家 2 先手 (执黑)";
                 diffWrapper.style.display = 'none';
                 onlineWrapper.style.display = 'none';
                 btnUndo.style.display = 'block';
             } else if (mode === 'ai') {
-                nameP1El.innerText = "玩家";
-                nameP2El.innerText = "AI 电脑";
-                diffWrapper.style.display = 'block';
+                firstPlayerWrapper.style.display = 'flex';
+                document.getElementById('first-p1').innerText = "玩家先手 (执黑)";
+                document.getElementById('first-p2').innerText = "AI 先手 (执黑)";
+                diffWrapper.style.display = 'flex';
                 onlineWrapper.style.display = 'none';
                 btnUndo.style.display = 'block';
-                expandDifficulty();
             } else if (mode === 'online') {
+                firstPlayerWrapper.style.display = 'flex';
+                document.getElementById('first-p1').innerText = "房主先手 (执黑)";
+                document.getElementById('first-p2').innerText = "访客先手 (执黑)";
                 diffWrapper.style.display = 'none';
                 onlineWrapper.style.display = 'flex';
-                btnUndo.style.display = 'none'; // 联机模式下禁用悔棋功能
-                updateOnlineNames();
+                btnUndo.style.display = 'none'; // 联机模式下禁用悔棋
             }
             resetGame();
         }
 
-        function updateOnlineNames() {
-            if (myRole === P1) {
-                nameP1El.innerText = "我 (黑子)";
-                nameP2El.innerText = "对方 (白子)";
-            } else {
-                nameP1El.innerText = "对方 (黑子)";
-                nameP2El.innerText = "我 (白子)";
+        function selectFirstPlayer(first) {
+            playSound('click');
+            document.getElementById('first-p1').classList.toggle('active', first === 'p1');
+            document.getElementById('first-p2').classList.toggle('active', first === 'p2');
+
+            if (gameMode === 'ai') {
+                userRoleInAI = (first === 'p1') ? P1 : P2;
+            } else if (gameMode === 'online') {
+                myRole = (first === 'p1') ? P1 : P2;
             }
+            resetGame();
         }
 
         function selectDifficulty(diff) {
-            if (history.length > 0) return;
             playSound('click');
-
             aiDifficulty = diff;
-            document.querySelectorAll('.diff-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('#difficulty-wrapper .opt-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`diff-${diff}`).classList.add('active');
-
-            currentDiffText.innerText = diffNames[diff];
-            collapseDifficulty();
+            resetGame();
         }
 
-        function collapseDifficulty() {
-            diffExpanded.style.display = 'none';
-            diffCollapsed.style.display = 'flex';
-        }
-
-        function expandDifficulty() {
-            if (history.length > 0) return;
-            playSound('click');
-            diffExpanded.style.display = 'flex';
-            diffCollapsed.style.display = 'none';
+        function updateNamesDisplay() {
+            if (gameMode === 'pvp') {
+                const isP1First = document.getElementById('first-p1').classList.contains('active');
+                nameP1El.innerText = isP1First ? "玩家 1 (黑)" : "玩家 2 (黑)";
+                nameP2El.innerText = isP1First ? "玩家 2 (白)" : "玩家 1 (白)";
+            } else if (gameMode === 'ai') {
+                if (userRoleInAI === P1) {
+                    nameP1El.innerText = "玩家 (黑)";
+                    nameP2El.innerText = "AI 电脑 (白)";
+                } else {
+                    nameP1El.innerText = "AI 电脑 (黑)";
+                    nameP2El.innerText = "玩家 (白)";
+                }
+            } else if (gameMode === 'online') {
+                if (myRole === P1) {
+                    nameP1El.innerText = "我 (黑子先手)";
+                    nameP2El.innerText = "对方 (白子后手)";
+                } else {
+                    nameP1El.innerText = "对方 (黑子先手)";
+                    nameP2El.innerText = "我 (白子后手)";
+                }
+            }
         }
 
         function initBoard() {
@@ -756,7 +744,9 @@
             grid = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
             history = [];
             gameOver = false;
-            currentTurn = P1;
+            currentTurn = P1; // 始终从黑子开始
+
+            updateNamesDisplay();
 
             breakdownP1.style.display = 'none';
             breakdownP2.style.display = 'none';
@@ -765,7 +755,6 @@
 
             btnUndo.disabled = false;
             btnUndo.style.opacity = '1';
-            btnChangeDiff.disabled = false;
 
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
@@ -781,11 +770,18 @@
                 }
             }
             updateUI();
+
+            // 如果是 AI 模式且 AI 执黑先手，则触发 AI 第一步
+            if (gameMode === 'ai' && userRoleInAI === P2) {
+                setTimeout(aiMove, 300);
+            }
         }
 
         function handleCellClick(r, c, isRemote = false) {
             if (gameOver || grid[r][c] !== EMPTY) return;
-            if (gameMode === 'ai' && currentTurn !== P1) return;
+            
+            // AI 模式限制：非当前玩家回合不能点击
+            if (gameMode === 'ai' && currentTurn !== userRoleInAI) return;
 
             // 联机模式逻辑限制
             if (gameMode === 'online' && !isRemote) {
@@ -799,14 +795,9 @@
                 }
             }
 
-            if (history.length === 0 && gameMode === 'ai') {
-                collapseDifficulty();
-                btnChangeDiff.disabled = true;
-            }
-
             makeMove(r, c, currentTurn);
 
-            // 如果是本地玩家点击且处于联机模式，推送到对方页面
+            // 联机发送步骤
             if (gameMode === 'online' && !isRemote && conn) {
                 conn.send({ type: 'MOVE', r: r, c: c, player: myRole });
             }
@@ -816,9 +807,8 @@
                 return;
             }
 
-            if (gameMode === 'ai' && !gameOver) {
-                currentTurn = P2;
-                updateUI();
+            // 如果是 AI 模式且还没结束，轮到 AI 落子
+            if (gameMode === 'ai' && !gameOver && currentTurn !== userRoleInAI) {
                 setTimeout(aiMove, 250);
             }
         }
@@ -834,7 +824,7 @@
             piece.className = `piece ${player === P1 ? 'black' : 'white'}`;
             cell.appendChild(piece);
 
-            currentTurn = player === P1 ? P2 : P1;
+            currentTurn = (player === P1) ? P2 : P1;
             updateUI();
         }
 
@@ -843,13 +833,18 @@
             playSound('undo');
 
             if (gameMode === 'ai') {
+                // 回退直到轮到玩家落子
                 while (history.length > 0) {
                     const last = history.pop();
                     grid[last.r][last.c] = EMPTY;
                     boardEl.children[last.r * BOARD_SIZE + last.c].innerHTML = '';
-                    if (last.player === P1) break;
+                    if (last.player === userRoleInAI) break;
                 }
-                currentTurn = P1;
+                currentTurn = userRoleInAI;
+                // 如果回退光了且玩家是白子，AI需重新下第一步
+                if (history.length === 0 && userRoleInAI === P2) {
+                    setTimeout(aiMove, 250);
+                }
             } else {
                 const last = history.pop();
                 grid[last.r][last.c] = EMPTY;
@@ -857,15 +852,13 @@
                 currentTurn = last.player;
             }
 
-            if (history.length === 0) {
-                btnChangeDiff.disabled = false;
-            }
-
             updateUI();
         }
 
         function aiMove() {
             if (gameOver) return;
+
+            const aiRole = (userRoleInAI === P1) ? P2 : P1;
 
             const emptyCells = [];
             for (let r = 0; r < BOARD_SIZE; r++) {
@@ -885,11 +878,11 @@
                 let ratedMoves = [];
 
                 emptyCells.forEach(({r, c}) => {
-                    grid[r][c] = P2;
-                    let attackValue = analyzePatterns(grid, P2).totalScore;
+                    grid[r][c] = aiRole;
+                    let attackValue = analyzePatterns(grid, aiRole).totalScore;
 
-                    grid[r][c] = P1;
-                    let defenseValue = analyzePatterns(grid, P1).totalScore;
+                    grid[r][c] = userRoleInAI;
+                    let defenseValue = analyzePatterns(grid, userRoleInAI).totalScore;
 
                     grid[r][c] = EMPTY;
 
@@ -916,27 +909,18 @@
                 }
             }
 
-            makeMove(choice.r, choice.c, P2);
+            makeMove(choice.r, choice.c, aiRole);
 
             if (checkBoardFull()) {
                 endGame();
-            } else {
-                currentTurn = P1;
-                updateUI();
             }
         }
 
-        // --- 积分算法 ---
+        // --- 积分计算算法 ---
         function analyzePatterns(boardState, player) {
             let details = {
-                tongtian: 0,    
-                longDiag: 0,    
-                bigWuhu: 0,     
-                smallWuhu: 0,   
-                sixie: 0,       
-                sanxie: 0,      
-                xiaojing: 0,    
-                totalScore: 0
+                tongtian: 0, longDiag: 0, bigWuhu: 0, smallWuhu: 0,   
+                sixie: 0, sanxie: 0, xiaojing: 0, totalScore: 0
             };
 
             for (let i = 0; i < 5; i++) {
@@ -948,61 +932,39 @@
             if ([0,1,2,3,4].every(i => boardState[i][4 - i] === player)) details.longDiag++;
 
             const bigWuhuCoords = [[0,0], [0,4], [2,2], [4,0], [4,4]];
-            if (bigWuhuCoords.every(([r, c]) => boardState[r][c] === player)) {
-                details.bigWuhu++;
-            }
+            if (bigWuhuCoords.every(([r, c]) => boardState[r][c] === player)) details.bigWuhu++;
 
             for (let r = 0; r <= 2; r++) {
                 for (let c = 0; c <= 2; c++) {
-                    const smallWuhuCoords = [
-                        [r, c],     [r, c+2],
-                        [r+1, c+1],
-                        [r+2, c],   [r+2, c+2]
-                    ];
-                    if (smallWuhuCoords.every(([pr, pc]) => boardState[pr][pc] === player)) {
-                        details.smallWuhu++;
-                    }
+                    const smallWuhuCoords = [[r, c], [r, c+2], [r+1, c+1], [r+2, c], [r+2, c+2]];
+                    if (smallWuhuCoords.every(([pr, pc]) => boardState[pr][pc] === player)) details.smallWuhu++;
                 }
             }
 
             const quadDiags = [
-                [[0,1], [1,2], [2,3], [3,4]],
-                [[1,0], [2,1], [3,2], [4,3]],
-                [[0,3], [1,2], [2,1], [3,0]],
-                [[1,4], [2,3], [3,2], [4,1]]
+                [[0,1], [1,2], [2,3], [3,4]], [[1,0], [2,1], [3,2], [4,3]],
+                [[0,3], [1,2], [2,1], [3,0]], [[1,4], [2,3], [3,2], [4,1]]
             ];
-            quadDiags.forEach(d => {
-                if (d.every(([r, c]) => boardState[r][c] === player)) details.sixie++;
-            });
+            quadDiags.forEach(d => { if (d.every(([r, c]) => boardState[r][c] === player)) details.sixie++; });
 
             const triDiags = [
-                [[0,2], [1,3], [2,4]],
-                [[2,0], [3,1], [4,2]],
-                [[0,2], [1,1], [2,0]],
-                [[2,4], [3,3], [4,2]]
+                [[0,2], [1,3], [2,4]], [[2,0], [3,1], [4,2]],
+                [[0,2], [1,1], [2,0]], [[2,4], [3,3], [4,2]]
             ];
-            triDiags.forEach(d => {
-                if (d.every(([r, c]) => boardState[r][c] === player)) details.sanxie++;
-            });
+            triDiags.forEach(d => { if (d.every(([r, c]) => boardState[r][c] === player)) details.sanxie++; });
 
             for (let r = 0; r < 4; r++) {
                 for (let c = 0; c < 4; c++) {
-                    if (boardState[r][c] === player &&
-                        boardState[r+1][c] === player &&
-                        boardState[r][c+1] === player &&
-                        boardState[r+1][c+1] === player) {
+                    if (boardState[r][c] === player && boardState[r+1][c] === player &&
+                        boardState[r][c+1] === player && boardState[r+1][c+1] === player) {
                         details.xiaojing++;
                     }
                 }
             }
 
-            details.totalScore = details.tongtian * 10 + 
-                                details.longDiag * 10 +
-                                details.bigWuhu * 10 + 
-                                details.smallWuhu * 5 + 
-                                details.sixie * 4 + 
-                                details.sanxie * 3 + 
-                                details.xiaojing * 2;
+            details.totalScore = details.tongtian * 10 + details.longDiag * 10 +
+                                details.bigWuhu * 10 + details.smallWuhu * 5 + 
+                                details.sixie * 4 + details.sanxie * 3 + details.xiaojing * 2;
 
             return details;
         }
@@ -1039,9 +1001,7 @@
             if (data.sanxie > 0) items.push(`<div class="breakdown-item"><span>三斜(3分):</span><b>${data.sanxie}个</b></div>`);
             if (data.xiaojing > 0) items.push(`<div class="breakdown-item"><span>小井(2分):</span><b>${data.xiaojing}个</b></div>`);
             
-            if (items.length === 0) {
-                return '<div class="breakdown-item"><span>无成型型态</span></div>';
-            }
+            if (items.length === 0) return '<div class="breakdown-item"><span>无成型型态</span></div>';
             return items.join('');
         }
 
@@ -1097,9 +1057,8 @@
             initBoard();
         }
 
-        // ================= PeerJS 联网对战模块 (4位数字房间号) =================
+        // ================= PeerJS 联网对战模块 =================
 
-        // 生成 4 位随机数字房间号
         function generateShortCode() {
             return Math.floor(1000 + Math.random() * 9000).toString();
         }
@@ -1119,13 +1078,17 @@
                 peer.on('connection', (incomingConn) => {
                     conn = incomingConn;
                     setupListeners();
-                    myRole = P1; // 房主执黑
-                    updateOnlineNames();
-                    alert("玩家 2 已加入对局！你执黑子先手。");
+                    
+                    // 将房主选择的先手状态告知访客
+                    conn.on('open', () => {
+                        conn.send({ type: 'INIT_ROLE', hostRole: myRole });
+                    });
+
+                    updateNamesDisplay();
+                    alert(`访客已加入对局！你执${myRole === P1 ? '黑子(先手)' : '白子(后手)'}。`);
                     resetGame();
                 });
 
-                // 如果数字房间号被占用，自动更换新数字重试
                 peer.on('error', (err) => {
                     if (err.type === 'unavailable-id' && !customRoomId) {
                         peer.destroy();
@@ -1142,14 +1105,12 @@
         }
 
         function createOnlineRoom() {
-            // 如果已有连接先销毁
             if (peer) {
                 peer.destroy();
                 peer = null;
             }
             initPeer(null, (roomId) => {
-                myRole = P1;
-                updateOnlineNames();
+                updateNamesDisplay();
                 const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
                 onlineStatusText.innerHTML = `
                     房间号: <b style="color:#f6ad55; font-size:1.3rem; letter-spacing:1px;">${roomId}</b><br>
@@ -1169,11 +1130,8 @@
                 peer.destroy();
                 peer = null;
             }
-            // 客户端加入时随机生成一个独立 ID 即可
             peer = new Peer();
             peer.on('open', () => {
-                myRole = P2; // 访客执白
-                updateOnlineNames();
                 conn = peer.connect(targetRoomId);
                 setupListeners();
             });
@@ -1188,10 +1146,14 @@
         function setupListeners() {
             conn.on('open', () => {
                 onlineStatusText.innerHTML = "🟢 <span style='color:#68d391;'>与对方连接成功，对局开始！</span>";
-                resetGame();
             });
             conn.on('data', (data) => {
-                if (data.type === 'MOVE') {
+                if (data.type === 'INIT_ROLE') {
+                    // 访客的角色与房主相反
+                    myRole = (data.hostRole === P1) ? P2 : P1;
+                    updateNamesDisplay();
+                    resetGame();
+                } else if (data.type === 'MOVE') {
                     handleCellClick(data.r, data.c, true); // 执行对方落子
                 }
             });
