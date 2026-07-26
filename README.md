@@ -20,4 +20,4 @@
 可以单人对战AI
 双人对战(两台设备)
 
-打开网页直接开玩： https://github.com/MaoYinCC/WuHu
+打开网页直接开玩： https://github.com/MaoYinCC/WuHu/
