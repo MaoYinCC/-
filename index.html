@@ -88,6 +88,7 @@
             background: #2d3748;
             padding: 4px;
             border-radius: 12px;
+            transition: all 0.3s;
         }
 
         .mode-btn {
@@ -121,6 +122,7 @@
             align-items: center;
             justify-content: space-between;
             border: 1px solid #4a5568;
+            transition: all 0.3s;
         }
 
         .option-btn-group {
@@ -159,6 +161,7 @@
             gap: 8px;
             align-items: center;
             border: 1px solid #4a5568;
+            transition: all 0.3s;
         }
 
         .online-inputs {
@@ -364,19 +367,20 @@
 
         .controls {
             display: flex;
-            gap: 12px;
+            gap: 8px;
             width: 100%;
         }
 
         .btn {
             flex: 1;
-            padding: 10px;
+            padding: 10px 4px;
             border: none;
             border-radius: 10px;
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.2s;
+            text-align: center;
         }
 
         .btn-primary {
@@ -465,7 +469,7 @@
             <div class="rule-summary">通天/斜通天/大五虎 10分 | 小五虎 5分<br>四斜 4分 | 三斜 3分 | 小井 2分</div>
         </header>
 
-        <div class="mode-selector">
+        <div class="mode-selector" id="mode-selector-container">
             <button class="mode-btn active" id="mode-pvp" onclick="switchMode('pvp')">双人对决</button>
             <button class="mode-btn" id="mode-ai" onclick="switchMode('ai')">人机对战</button>
             <button class="mode-btn" id="mode-online" onclick="switchMode('online')">🌐 跨城联机</button>
@@ -473,8 +477,8 @@
 
         <!-- 先手选择面板 -->
         <div class="option-wrapper" id="first-player-wrapper">
-            <span>♟️ 先手选择:</span>
-            <div class="option-btn-group">
+            <span id="first-label">♟️ 先手选择:</span>
+            <div class="option-btn-group" id="first-btn-group">
                 <button class="opt-btn active" id="first-p1" onclick="selectFirstPlayer('p1')">玩家先手 (执黑)</button>
                 <button class="opt-btn" id="first-p2" onclick="selectFirstPlayer('p2')">玩家后手 (执白)</button>
             </div>
@@ -492,7 +496,7 @@
 
         <!-- 联机面板 -->
         <div class="online-wrapper" id="online-wrapper" style="display: none;">
-            <div class="online-inputs">
+            <div class="online-inputs" id="online-inputs-container">
                 <button class="online-btn" onclick="createOnlineRoom()">新建房间 (房主)</button>
                 <input type="text" class="online-input" id="room-id-input" placeholder="输入4位数字房间号">
                 <button class="online-btn" onclick="joinOnlineRoomFromInput()">加入</button>
@@ -530,7 +534,8 @@
 
         <div class="controls">
             <button class="btn btn-secondary" id="btn-undo" onclick="undoMove()">悔棋</button>
-            <button class="btn btn-primary" onclick="resetGame()">重新开始</button>
+            <button class="btn btn-primary" id="btn-restart" onclick="resetGame()">再来一局</button>
+            <button class="btn btn-secondary" id="btn-exit" onclick="exitToSettings()">返回设置</button>
         </div>
     </div>
 
@@ -541,7 +546,7 @@
             <div class="modal-body" id="win-body">获胜者！</div>
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-outline" onclick="reviewBoard()">🔍 查看棋盘复盘</button>
-                <button class="modal-btn modal-btn-primary" onclick="closeModalAndReset()">再局</button>
+                <button class="modal-btn modal-btn-primary" onclick="closeModalAndReset()">再来一局</button>
             </div>
         </div>
     </div>
@@ -636,16 +641,18 @@
 
         let grid = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
         let history = [];
-        let currentTurn = P1; // 永远从执黑的 P1 开始
+        let currentTurn = P1;
         let gameMode = 'pvp';
         let aiDifficulty = 'medium';
-        let userRoleInAI = P1; // 在 AI 模式中，玩家扮演角色：P1(黑子/先手) 或 P2(白子/后手)
+        let userRoleInAI = P1;
         let gameOver = false;
+        let gameStarted = false; // 标记对局是否已经开始
 
         // 联网专用变量
         let peer = null;
         let conn = null;
-        let myRole = P1; // 联网模式中我的角色
+        let myRole = P1;
+        let isHost = false;
 
         const boardEl = document.getElementById('board');
         const scoreP1El = document.getElementById('score-p1');
@@ -658,9 +665,11 @@
         const breakdownP2 = document.getElementById('breakdown-p2');
         const btnUndo = document.getElementById('btn-undo');
         
+        const modeSelectorContainer = document.getElementById('mode-selector-container');
         const firstPlayerWrapper = document.getElementById('first-player-wrapper');
         const diffWrapper = document.getElementById('difficulty-wrapper');
         const onlineWrapper = document.getElementById('online-wrapper');
+        const onlineInputsContainer = document.getElementById('online-inputs-container');
         const onlineStatusText = document.getElementById('online-status-text');
 
         function switchMode(mode) {
@@ -670,16 +679,20 @@
             document.getElementById(`mode-${mode}`).classList.add('active');
 
             if (mode === 'pvp') {
+                isHost = false;
                 firstPlayerWrapper.style.display = 'flex';
                 document.getElementById('first-p1').innerText = "玩家 1 先手 (执黑)";
                 document.getElementById('first-p2').innerText = "玩家 2 先手 (执黑)";
+                setFirstPlayerControlsEnabled(true);
                 diffWrapper.style.display = 'none';
                 onlineWrapper.style.display = 'none';
                 btnUndo.style.display = 'block';
             } else if (mode === 'ai') {
+                isHost = false;
                 firstPlayerWrapper.style.display = 'flex';
                 document.getElementById('first-p1').innerText = "玩家先手 (执黑)";
                 document.getElementById('first-p2').innerText = "AI 先手 (执黑)";
+                setFirstPlayerControlsEnabled(true);
                 diffWrapper.style.display = 'flex';
                 onlineWrapper.style.display = 'none';
                 btnUndo.style.display = 'block';
@@ -689,12 +702,39 @@
                 document.getElementById('first-p2').innerText = "访客先手 (执黑)";
                 diffWrapper.style.display = 'none';
                 onlineWrapper.style.display = 'flex';
-                btnUndo.style.display = 'none'; // 联机模式下禁用悔棋
+                onlineInputsContainer.style.display = 'flex';
+                btnUndo.style.display = 'none';
+
+                if (!conn || !conn.open) {
+                    isHost = true;
+                    myRole = P1;
+                    document.getElementById('first-p1').classList.add('active');
+                    document.getElementById('first-p2').classList.remove('active');
+                    setFirstPlayerControlsEnabled(true);
+                } else {
+                    setFirstPlayerControlsEnabled(isHost);
+                }
             }
             resetGame();
         }
 
+        function setFirstPlayerControlsEnabled(enabled) {
+            const btns = document.querySelectorAll('#first-btn-group .opt-btn');
+            btns.forEach(btn => {
+                btn.style.pointerEvents = enabled ? 'auto' : 'none';
+                btn.style.opacity = enabled ? '1' : '0.6';
+            });
+            const label = document.getElementById('first-label');
+            if (gameMode === 'online' && !enabled) {
+                label.innerText = "♟️ 先手选择 (仅房主可调):";
+            } else {
+                label.innerText = "♟️ 先手选择:";
+            }
+        }
+
         function selectFirstPlayer(first) {
+            if (gameMode === 'online' && !isHost) return;
+
             playSound('click');
             document.getElementById('first-p1').classList.toggle('active', first === 'p1');
             document.getElementById('first-p2').classList.toggle('active', first === 'p2');
@@ -703,6 +743,9 @@
                 userRoleInAI = (first === 'p1') ? P1 : P2;
             } else if (gameMode === 'online') {
                 myRole = (first === 'p1') ? P1 : P2;
+                if (isHost && conn && conn.open) {
+                    conn.send({ type: 'INIT_ROLE', hostRole: myRole });
+                }
             }
             resetGame();
         }
@@ -730,11 +773,35 @@
                 }
             } else if (gameMode === 'online') {
                 if (myRole === P1) {
-                    nameP1El.innerText = "我 (黑子先手)";
-                    nameP2El.innerText = "对方 (白子后手)";
+                    nameP1El.innerText = isHost ? "我 (房主/黑)" : "我 (访客/黑)";
+                    nameP2El.innerText = isHost ? "对方 (访客/白)" : "对方 (房主/白)";
                 } else {
-                    nameP1El.innerText = "对方 (黑子先手)";
-                    nameP2El.innerText = "我 (白子后手)";
+                    nameP1El.innerText = isHost ? "我 (房主/白)" : "我 (访客/白)";
+                    nameP2El.innerText = isHost ? "对方 (访客/黑)" : "对方 (房主/黑)";
+                }
+            }
+        }
+
+        // 根据游戏状态切换配置界面的显示/隐藏（实现“对局中仅保留棋盘和按钮”）
+        function updateUIVisibility() {
+            if (gameStarted) {
+                modeSelectorContainer.style.display = 'none';
+                firstPlayerWrapper.style.display = 'none';
+                diffWrapper.style.display = 'none';
+                if (gameMode === 'online') {
+                    onlineInputsContainer.style.display = 'none'; // 联机开始后隐藏房间输入栏，保留状态提示
+                } else {
+                    onlineWrapper.style.display = 'none';
+                }
+            } else {
+                modeSelectorContainer.style.display = 'flex';
+                if (gameMode === 'pvp' || gameMode === 'ai') {
+                    firstPlayerWrapper.style.display = 'flex';
+                    if (gameMode === 'ai') diffWrapper.style.display = 'flex';
+                } else if (gameMode === 'online') {
+                    firstPlayerWrapper.style.display = 'flex';
+                    onlineWrapper.style.display = 'flex';
+                    onlineInputsContainer.style.display = 'flex';
                 }
             }
         }
@@ -744,7 +811,7 @@
             grid = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
             history = [];
             gameOver = false;
-            currentTurn = P1; // 始终从黑子开始
+            currentTurn = P1;
 
             updateNamesDisplay();
 
@@ -771,7 +838,6 @@
             }
             updateUI();
 
-            // 如果是 AI 模式且 AI 执黑先手，则触发 AI 第一步
             if (gameMode === 'ai' && userRoleInAI === P2) {
                 setTimeout(aiMove, 300);
             }
@@ -780,10 +846,8 @@
         function handleCellClick(r, c, isRemote = false) {
             if (gameOver || grid[r][c] !== EMPTY) return;
             
-            // AI 模式限制：非当前玩家回合不能点击
             if (gameMode === 'ai' && currentTurn !== userRoleInAI) return;
 
-            // 联机模式逻辑限制
             if (gameMode === 'online' && !isRemote) {
                 if (!conn || !conn.open) {
                     alert("尚未连接到对方，请先创建或加入房间！");
@@ -795,9 +859,14 @@
                 }
             }
 
+            // 第一次落子时，触发全屏配置隐藏
+            if (!gameStarted) {
+                gameStarted = true;
+                updateUIVisibility();
+            }
+
             makeMove(r, c, currentTurn);
 
-            // 联机发送步骤
             if (gameMode === 'online' && !isRemote && conn) {
                 conn.send({ type: 'MOVE', r: r, c: c, player: myRole });
             }
@@ -807,7 +876,6 @@
                 return;
             }
 
-            // 如果是 AI 模式且还没结束，轮到 AI 落子
             if (gameMode === 'ai' && !gameOver && currentTurn !== userRoleInAI) {
                 setTimeout(aiMove, 250);
             }
@@ -833,7 +901,6 @@
             playSound('undo');
 
             if (gameMode === 'ai') {
-                // 回退直到轮到玩家落子
                 while (history.length > 0) {
                     const last = history.pop();
                     grid[last.r][last.c] = EMPTY;
@@ -841,7 +908,6 @@
                     if (last.player === userRoleInAI) break;
                 }
                 currentTurn = userRoleInAI;
-                // 如果回退光了且玩家是白子，AI需重新下第一步
                 if (history.length === 0 && userRoleInAI === P2) {
                     setTimeout(aiMove, 250);
                 }
@@ -851,7 +917,6 @@
                 boardEl.children[last.r * BOARD_SIZE + last.c].innerHTML = '';
                 currentTurn = last.player;
             }
-
             updateUI();
         }
 
@@ -909,6 +974,11 @@
                 }
             }
 
+            if (!gameStarted) {
+                gameStarted = true;
+                updateUIVisibility();
+            }
+
             makeMove(choice.r, choice.c, aiRole);
 
             if (checkBoardFull()) {
@@ -916,7 +986,6 @@
             }
         }
 
-        // --- 积分计算算法 ---
         function analyzePatterns(boardState, player) {
             let details = {
                 tongtian: 0, longDiag: 0, bigWuhu: 0, smallWuhu: 0,   
@@ -1052,6 +1121,16 @@
             resetGame();
         }
 
+        function exitToSettings() {
+            playSound('click');
+            if (history.length > 0 && !gameOver) {
+                if (!confirm("确定要放弃当前对局并返回设置界面吗？")) return;
+            }
+            gameStarted = false;
+            updateUIVisibility();
+            initBoard();
+        }
+
         function resetGame() {
             playSound('click');
             initBoard();
@@ -1071,7 +1150,9 @@
                 peer = new Peer(roomId);
 
                 peer.on('open', (id) => {
-                    onlineStatusText.innerText = "房间创建成功！";
+                    onlineStatusText.innerText = "房间创建成功！等待好友加入...";
+                    isHost = true;
+                    setFirstPlayerControlsEnabled(true);
                     if (callback) callback(id);
                 });
 
@@ -1079,13 +1160,14 @@
                     conn = incomingConn;
                     setupListeners();
                     
-                    // 将房主选择的先手状态告知访客
                     conn.on('open', () => {
+                        const isP1First = document.getElementById('first-p1').classList.contains('active');
+                        myRole = isP1First ? P1 : P2;
                         conn.send({ type: 'INIT_ROLE', hostRole: myRole });
                     });
 
                     updateNamesDisplay();
-                    alert(`访客已加入对局！你执${myRole === P1 ? '黑子(先手)' : '白子(后手)'}。`);
+                    alert(`访客已加入对局！你作为房主执${myRole === P1 ? '黑子(先手)' : '白子(后手)'}。`);
                     resetGame();
                 });
 
@@ -1109,12 +1191,13 @@
                 peer.destroy();
                 peer = null;
             }
+            isHost = true;
             initPeer(null, (roomId) => {
                 updateNamesDisplay();
                 const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
                 onlineStatusText.innerHTML = `
                     房间号: <b style="color:#f6ad55; font-size:1.3rem; letter-spacing:1px;">${roomId}</b><br>
-                    <button class="online-btn" style="margin-top:4px;" onclick="navigator.clipboard.writeText('${shareUrl}');alert('邀请链接已复制！网页链接与房间号：${roomId}')">📋 复制好友邀请链接</button>
+                    <button class="online-btn" style="margin-top:4px;" onclick="navigator.clipboard.writeText('${shareUrl}');alert('邀请链接已复制！房间号：${roomId}')">📋 复制好友邀请链接</button>
                 `;
             });
         }
@@ -1130,6 +1213,9 @@
                 peer.destroy();
                 peer = null;
             }
+            isHost = false;
+            setFirstPlayerControlsEnabled(false);
+
             peer = new Peer();
             peer.on('open', () => {
                 conn = peer.connect(targetRoomId);
@@ -1149,12 +1235,20 @@
             });
             conn.on('data', (data) => {
                 if (data.type === 'INIT_ROLE') {
-                    // 访客的角色与房主相反
                     myRole = (data.hostRole === P1) ? P2 : P1;
+                    
+                    document.getElementById('first-p1').classList.toggle('active', data.hostRole === P1);
+                    document.getElementById('first-p2').classList.toggle('active', data.hostRole === P2);
+
                     updateNamesDisplay();
                     resetGame();
                 } else if (data.type === 'MOVE') {
-                    handleCellClick(data.r, data.c, true); // 执行对方落子
+                    // 对方落子时自动开启全屏对局
+                    if (!gameStarted) {
+                        gameStarted = true;
+                        updateUIVisibility();
+                    }
+                    handleCellClick(data.r, data.c, true);
                 }
             });
             conn.on('close', () => {
@@ -1163,7 +1257,6 @@
             });
         }
 
-        // 检查链接里是否有 ?room=XXXX，有则自动加入
         window.addEventListener('load', () => {
             initBoard();
             const urlParams = new URLSearchParams(window.location.search);
