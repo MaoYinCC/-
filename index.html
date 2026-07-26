@@ -501,10 +501,10 @@
         <div class="online-wrapper" id="online-wrapper" style="display: none;">
             <div class="online-inputs">
                 <button class="online-btn" onclick="createOnlineRoom()">新建房间 (房主)</button>
-                <input type="text" class="online-input" id="room-id-input" placeholder="输入对方房间号">
+                <input type="text" class="online-input" id="room-id-input" placeholder="输入4位数字房间号">
                 <button class="online-btn" onclick="joinOnlineRoomFromInput()">加入</button>
             </div>
-            <div class="online-status" id="online-status-text">提示：新建房间后将自动生成邀请链接</div>
+            <div class="online-status" id="online-status-text">提示：新建房间后将自动生成4位数字房间号</div>
         </div>
 
         <div class="difficulty-wrapper" id="difficulty-wrapper" style="display: none;">
@@ -563,7 +563,7 @@
             <div class="modal-body" id="win-body">获胜者！</div>
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-outline" onclick="reviewBoard()">🔍 查看棋盘复盘</button>
-                <button class="modal-btn modal-btn-primary" onclick="closeModalAndReset()">再来一局</button>
+                <button class="modal-btn modal-btn-primary" onclick="closeModalAndReset()">再局</button>
             </div>
         </div>
     </div>
@@ -926,7 +926,7 @@
             }
         }
 
-        // --- 积分算法（保持原版精准判定） ---
+        // --- 积分算法 ---
         function analyzePatterns(boardState, player) {
             let details = {
                 tongtian: 0,    
@@ -1097,16 +1097,25 @@
             initBoard();
         }
 
-        // ================= PeerJS 联网对战模块 =================
+        // ================= PeerJS 联网对战模块 (4位数字房间号) =================
 
-        function initPeer(callback) {
+        // 生成 4 位随机数字房间号
+        function generateShortCode() {
+            return Math.floor(1000 + Math.random() * 9000).toString();
+        }
+
+        function initPeer(customRoomId, callback) {
             if (!peer) {
-                onlineStatusText.innerText = "正在连接服务器...";
-                peer = new Peer();
+                onlineStatusText.innerText = "正在创建4位数字房间...";
+                const roomId = customRoomId || generateShortCode();
+                
+                peer = new Peer(roomId);
+
                 peer.on('open', (id) => {
-                    onlineStatusText.innerText = "服务器连接就绪！";
+                    onlineStatusText.innerText = "房间创建成功！";
                     if (callback) callback(id);
                 });
+
                 peer.on('connection', (incomingConn) => {
                     conn = incomingConn;
                     setupListeners();
@@ -1115,35 +1124,64 @@
                     alert("玩家 2 已加入对局！你执黑子先手。");
                     resetGame();
                 });
+
+                // 如果数字房间号被占用，自动更换新数字重试
+                peer.on('error', (err) => {
+                    if (err.type === 'unavailable-id' && !customRoomId) {
+                        peer.destroy();
+                        peer = null;
+                        initPeer(null, callback);
+                    } else if (err.type === 'peer-unavailable') {
+                        alert("找不到该房间号，请核对是否输入正确！");
+                        onlineStatusText.innerText = "连接失败：未找到该房间";
+                    }
+                });
             } else if (callback) {
                 callback(peer.id);
             }
         }
 
         function createOnlineRoom() {
-            initPeer((roomId) => {
+            // 如果已有连接先销毁
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            initPeer(null, (roomId) => {
                 myRole = P1;
                 updateOnlineNames();
                 const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
                 onlineStatusText.innerHTML = `
-                    房间号: <b>${roomId}</b><br>
-                    <button class="online-btn" style="margin-top:4px;" onclick="navigator.clipboard.writeText('${shareUrl}');alert('邀请链接已复制，去发送给好友吧！')">📋 复制邀请链接</button>
+                    房间号: <b style="color:#f6ad55; font-size:1.3rem; letter-spacing:1px;">${roomId}</b><br>
+                    <button class="online-btn" style="margin-top:4px;" onclick="navigator.clipboard.writeText('${shareUrl}');alert('邀请链接已复制！网页链接与房间号：${roomId}')">📋 复制好友邀请链接</button>
                 `;
             });
         }
 
         function joinOnlineRoomFromInput() {
             const roomId = document.getElementById('room-id-input').value.trim();
-            if (!roomId) { alert("请输入房间号！"); return; }
+            if (!roomId) { alert("请输入4位房间号！"); return; }
             joinOnlineRoom(roomId);
         }
 
         function joinOnlineRoom(targetRoomId) {
-            initPeer(() => {
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            // 客户端加入时随机生成一个独立 ID 即可
+            peer = new Peer();
+            peer.on('open', () => {
                 myRole = P2; // 访客执白
                 updateOnlineNames();
                 conn = peer.connect(targetRoomId);
                 setupListeners();
+            });
+            peer.on('error', (err) => {
+                if (err.type === 'peer-unavailable') {
+                    alert("找不到房间号【" + targetRoomId + "】，请检查输入是否正确！");
+                    onlineStatusText.innerText = "加入失败：房间不存在";
+                }
             });
         }
 
@@ -1171,7 +1209,7 @@
             if (roomId) {
                 switchMode('online');
                 document.getElementById('room-id-input').value = roomId;
-                onlineStatusText.innerText = "识别到邀请链接，正在尝试加入...";
+                onlineStatusText.innerText = "识别到邀请链接，正在加入房间 " + roomId + "...";
                 setTimeout(() => joinOnlineRoom(roomId), 800);
             }
         });
