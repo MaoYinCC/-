@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五虎棋 - 跨城联机版</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+        h1 { color: #333; margin-bottom: 10px; }
+        .controls { background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+        select, button, input { padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; cursor: pointer; }
+        button { background: #007bff; color: white; border: none; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .online-panel { background: #eef6ff; border: 1px solid #b6d4fe; padding: 10px; border-radius: 8px; width: 100%; max-width: 500px; text-align: center; margin-bottom: 15px; display: none; }
+        .board-container { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .board { display: grid; grid-template-columns: repeat(5, 60px); grid-template-rows: repeat(5, 60px); gap: 5px; background: #d1a054; padding: 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .cell { width: 60px; height: 60px; background: #e8c382; border-radius: 4px; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .cell:hover { background: #dfb36c; }
+        .piece { width: 46px; height: 46px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .black { background: #333; color: white; }
+        .white { background: #fff; color: #333; border: 1px solid #ccc; }
+        .status-panel { background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); min-width: 200px; }
+        .score-box { margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>🎮 五虎棋</h1>
+
+    <div class="controls">
+        <label>模式：</label>
+        <select id="modeSelect" onchange="changeMode()">
+            <option value="pvp">👥 本地双人</option>
+            <option value="ai">🤖 人机对战</option>
+            <option value="online">🌐 远程联机 (P2P)</option>
+        </select>
+
+        <select id="aiDifficulty" style="display:none;">
+            <option value="easy">简单 AI</option>
+            <option value="medium" selected>中等 AI</option>
+            <option value="hard">大师 AI</option>
+        </select>
+
+        <button onclick="resetGame()">重新开始</button>
+    </div>
+
+    <div id="onlinePanel" class="online-panel">
+        <div id="onlineSetup">
+            <button onclick="createRoom()">新建房间（房主）</button>
+            <span style="margin: 0 10px;">或</span>
+            <input type="text" id="roomInput" placeholder="输入对方房间号">
+            <button onclick="joinRoomFromInput()">加入房间</button>
+        </div>
+        <div id="onlineStatus" style="margin-top: 5px; font-weight: bold; color: #0056b3;"></div>
+    </div>
+
+    <div class="board-container">
+        <div id="board" class="board"></div>
+
+        <div class="status-panel">
+            <h3>📊 游戏状态</h3>
+            <p id="turnText" style="margin: 10px 0; font-size: 16px; font-weight: bold;">当前回合：黑方 (先手)</p>
+            <hr>
+            <div class="score-box">
+                <strong>黑方得分：</strong><span id="blackScore">0</span> 分
+            </div>
+            <div class="score-box">
+                <strong>白方得分：</strong><span id="whiteScore">0</span> 分
+            </div>
+            <div style="font-size: 12px; color: #666; margin-top: 10px;">
+                * 规则计分：大五虎10分、小五虎5分、四斜4分、三斜3分、小井2分。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 游戏核心变量 ---
+        const BOARD_SIZE = 5;
+        let boardState = Array(5).fill(null).map(() => Array(5).fill(null));
+        let currentPlayer = 'black'; // 'black' 或 'white'
+        let gameMode = 'pvp'; // 'pvp', 'ai', 'online'
+        let gameOver = false;
+
+        // 得分统计
+        let scores = { black: 0, white: 0 };
+
+        // --- 联网变量 (PeerJS) ---
+        let peer = null;
+        let conn = null;
+        let myRole = null; // 'black' (房主) 或 'white' (访客)
+
+        // 初始化页面
+        window.onload = () => {
+            createBoardUI();
+            checkUrlParams(); // 检查是否有自动加入房间的链接
+        };
+
+        // 创建 5x5 棋盘 DOM
+        function createBoardUI() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.onclick = () => handleCellClick(r, c);
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        // 处理点击落子
+        function handleCellClick(r, c, isRemote = false) {
+            if (gameOver || boardState[r][c] !== null) return;
+
+            // 联机模式下的权限校验
+            if (gameMode === 'online' && !isRemote) {
+                if (!conn || !conn.open) { alert("尚未连接到对方，请先创建或加入房间！"); return; }
+                if (currentPlayer !== myRole) { alert("当前是对方的回合，请等待！"); return; }
+            }
+
+            // 执行落子
+            makeMove(r, c, currentPlayer);
+
+            // 如果是本地落子且处于联机模式，发送给对方
+            if (gameMode === 'online' && !isRemote && conn) {
+                conn.send({ type: 'MOVE', r: r, c: c, player: currentPlayer });
+            }
+
+            // 检查 AI 回合
+            if (gameMode === 'ai' && currentPlayer === 'white' && !gameOver) {
+                setTimeout(makeAIMove, 400);
+            }
+        }
+
+        // 核心落子逻辑
+        function makeMove(r, c, player) {
+            boardState[r][c] = player;
+            renderPiece(r, c, player);
+
+            // 计算得分
+            calculateScores();
+
+            // 切换玩家
+            currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+            updateUI();
+        }
+
+        // 在棋盘上画棋子
+        function renderPiece(r, c, player) {
+            const cell = document.querySelector(`.cell[data-row='${r}'][data-col='${c}']`);
+            const piece = document.createElement('div');
+            piece.className = `piece ${player}`;
+            piece.innerText = player === 'black' ? '黑' : '白';
+            cell.appendChild(piece);
+        }
+
+        // 简化的阵型与得分计算（基于坐标判定）
+        function calculateScores() {
+            let blackScore = 0;
+            let whiteScore = 0;
+
+            // 遍历所有可能的 2x2 小井 (2分)
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const p = boardState[r][c];
+                    if (p && p === boardState[r+1][c] && p === boardState[r][c+1] && p === boardState[r+1][c+1]) {
+                        if (p === 'black') blackScore += 2;
+                        if (p === 'white') whiteScore += 2;
+                    }
+                }
+            }
+
+            // (此处可继续扩展大五虎、小五虎、斜线算法，数据会自动同步)
+            scores.black = blackScore;
+            scores.white = whiteScore;
+            document.getElementById('blackScore').innerText = scores.black;
+            document.getElementById('whiteScore').innerText = scores.white;
+        }
+
+        // AI 随机落子（示例逻辑）
+        function makeAIMove() {
+            let emptyCells = [];
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (boardState[r][c] === null) emptyCells.push({r, c});
+                }
+            }
+            if (emptyCells.length > 0) {
+                const choice = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                handleCellClick(choice.r, choice.c);
+            }
+        }
+
+        // 切换游戏模式
+        function changeMode() {
+            gameMode = document.getElementById('modeSelect').value;
+            document.getElementById('aiDifficulty').style.display = gameMode === 'ai' ? 'inline-block' : 'none';
+            document.getElementById('onlinePanel').style.display = gameMode === 'online' ? 'block' : 'none';
+            resetGame();
+        }
+
+        // 更新状态文字
+        function updateUI() {
+            const turnText = document.getElementById('turnText');
+            let text = `当前回合：${currentPlayer === 'black' ? '黑方 (先手)' : '白方 (后手)'}`;
+            if (gameMode === 'online') {
+                text += ` | 你是: ${myRole === 'black' ? '黑方 (房主)' : '白方 (访客)'}`;
+            }
+            turnText.innerText = text;
+        }
+
+        // 重置游戏
+        function resetGame() {
+            boardState = Array(5).fill(null).map(() => Array(5).fill(null));
+            currentPlayer = 'black';
+            gameOver = false;
+            scores = { black: 0, white: 0 };
+            document.getElementById('blackScore').innerText = '0';
+            document.getElementById('whiteScore').innerText = '0';
+            createBoardUI();
+            updateUI();
+        }
+
+        // ==================== PeerJS 联网逻辑 ====================
+
+        function initPeer(callback) {
+            if (!peer) {
+                document.getElementById('onlineStatus').innerText = "正在连接免费通信服务器...";
+                peer = new Peer();
+                peer.on('open', (id) => {
+                    document.getElementById('onlineStatus').innerText = "服务器连接成功！";
+                    if (callback) callback(id);
+                });
+                peer.on('connection', (incomingConn) => {
+                    conn = incomingConn;
+                    setupConnectionListeners();
+                    myRole = 'black'; // 房主执黑
+                    alert("玩家 2 已通过链接加入对局！游戏开始，你执黑先手。");
+                    updateUI();
+                });
+            } else if (callback) {
+                callback(peer.id);
+            }
+        }
+
+        // 创建房间（房主）
+        function createRoom() {
+            initPeer((roomId) => {
+                myRole = 'black';
+                const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+                document.getElementById('onlineStatus').innerHTML = `
+                    房间创建成功！房间号：<b>${roomId}</b><br>
+                    <button onclick="navigator.clipboard.writeText('${shareUrl}');alert('邀请链接已复制！发给好友即可。')">📋 复制好友邀请链接</button>
+                `;
+            });
+        }
+
+        // 手动输入房间号加入
+        function joinRoomFromInput() {
+            const roomId = document.getElementById('roomInput').value.trim();
+            if (!roomId) { alert("请输入房间号！"); return; }
+            joinRoom(roomId);
+        }
+
+        // 加入房间核心代码
+        function joinRoom(targetRoomId) {
+            initPeer(() => {
+                myRole = 'white'; // 访客执白
+                conn = peer.connect(targetRoomId);
+                setupConnectionListeners();
+            });
+        }
+
+        // 监听来自对方的网络数据
+        function setupConnectionListeners() {
+            conn.on('open', () => {
+                document.getElementById('onlineStatus').innerText = "🟢 成功与对方建立网络连接！可以开始落子。";
+                updateUI();
+            });
+            conn.on('data', (data) => {
+                if (data.type === 'MOVE') {
+                    handleCellClick(data.r, data.c, true); // 渲染对方落子
+                }
+            });
+            conn.on('close', () => {
+                alert("对方已断开连接！");
+            });
+        }
+
+        // 检查网址里是否有 ?room=XXXX 链接参数，实现点链接直接进入游戏
+        function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomId = urlParams.get('room');
+            if (roomId) {
+                document.getElementById('modeSelect').value = 'online';
+                changeMode();
+                document.getElementById('roomInput').value = roomId;
+                document.getElementById('onlineStatus').innerText = "检测到邀请链接，正在加入房间...";
+                setTimeout(() => joinRoom(roomId), 1000);
+            }
+        }
+    </script>
+</body>
+</html>
