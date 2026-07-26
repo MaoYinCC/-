@@ -23,3 +23,36 @@
 
 ## 打开网页直接开玩:
 https://maoyincc.github.io/WuHu/
+
+
+
+## 📖 Detailed Game Rules & Gameplay
+
+WuHu is a two-player board game played on a grid. Players take turns placing pieces to form specific geometric formations on the board to score points, with the winner determined by the highest score or by achieving specific victory conditions.
+
+### 1. Core Formations & Scores
+
+The game features an automated pattern recognition algorithm that awards points when pieces form the following geometric structures:
+
+* **Grand Tiger (10 pts)**: High-level geometric formations spanning diagonals or core large squares (including straight-line and long diagonal variants).
+* **Mini Tiger (5 pts)**: Specific 5-piece linked formations distributed across different regions of the board (supports 9 different directional variations of Mini Tigers).
+* **Quad Diagonal (4 pts)**: A standard diagonal formation consisting of 4 pieces.
+* **Triple Diagonal (3 pts)**: A basic diagonal formation consisting of 3 pieces.
+* **Mini Grid (2 pts)**: A compact $2 \times 2$ square/grid structure consisting of 4 pieces.
+
+### 2. Additive Scoring Mechanism
+
+* The game supports multi-pattern additive scoring. If a single move simultaneously activates multiple geometric formations (e.g., a single piece completes a "Mini Tiger" while also contributing to a "Quad Diagonal" and "Mini Grid"), the system automatically accumulates all qualifying pattern scores.
+* This mechanism greatly enhances the strategic depth of the game, requiring players to balance defense while engineering overlapping, multi-layered formations.
+
+---
+
+🚀 Quick Start / Local Execution
+Since this project is a purely frontend static page, it requires no Node.js or backend server environment:
+
+* Play solo against AI
+* Local two-player or cross-network multiplayer (across two devices)
+
+## Open the webpage and start playing directly:
+
+[https://maoyincc.github.io/WuHu/](https://maoyincc.github.io/WuHu/)
